@@ -37,6 +37,11 @@ type SkipItemAction = {
   payload: { id: string };
 };
 
+type UpdateOriginalUrlAction = {
+  type: 'UPDATE_ORIGINAL_URL';
+  payload: { id: string; originalUrl: string };
+};
+
 type ClearQueueAction = {
   type: 'CLEAR_QUEUE';
 };
@@ -48,6 +53,7 @@ export type QueueAction =
   | CompleteItemAction
   | FailItemAction
   | SkipItemAction
+  | UpdateOriginalUrlAction
   | ClearQueueAction;
 
 // --- Helpers ---
@@ -134,6 +140,18 @@ export function queueReducer(state: AppState, action: QueueAction): AppState {
       );
       const advanced = advanceToNextPending(updatedQueue);
       return { ...state, ...advanced };
+    }
+
+    case 'UPDATE_ORIGINAL_URL': {
+      const { id, originalUrl } = action.payload;
+      return {
+        ...state,
+        queue: state.queue.map((item) => {
+          if (item.id !== id) return item;
+          URL.revokeObjectURL(item.originalUrl);
+          return { ...item, originalUrl };
+        }),
+      };
     }
 
     case 'CLEAR_QUEUE': {

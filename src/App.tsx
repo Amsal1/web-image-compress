@@ -79,6 +79,19 @@ function App() {
         const bitmap = await decodeToImageBitmap(item.file);
         if (cancelled) { bitmap.close(); return; }
 
+        // For HEIC/HEIF on non-Safari browsers, the raw file URL isn't displayable.
+        // Encode the decoded bitmap at max quality to create a viewable original preview.
+        // Safari supports HEIC natively, so skip this to preserve the original experience.
+        const isHeic = item.file.type === 'image/heic' || item.file.type === 'image/heif';
+        const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+        if (isHeic && !isSafari && !cancelled) {
+          const previewBlob = await getEncoder().encode(bitmap, 1.0);
+          if (!cancelled) {
+            const previewUrl = URL.createObjectURL(previewBlob);
+            dispatch({ type: 'UPDATE_ORIGINAL_URL', payload: { id: item.id, originalUrl: previewUrl } });
+          }
+        }
+
         const targetSizeBytes = targetSizeKBRef.current * 1024;
         const config: CompressionConfig = {
           targetSizeBytes,
