@@ -158,6 +158,10 @@ function App() {
         </div>
 
         <DownloadAllButton items={state.queue} />
+
+        <p className="mt-8 text-center text-xs text-gray-400">
+          🔒 All compression happens in your browser. Your images never leave your device. Works offline once loaded.
+        </p>
       </div>
     </div>
   );
