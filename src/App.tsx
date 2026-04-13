@@ -52,36 +52,34 @@ function App() {
     setTargetSizeKB(kb);
   }, []);
 
-  // Processing loop
+  // Stable ref for targetSizeKB so the processing function always reads the latest
+  const targetSizeKBRef = useRef(targetSizeKB);
+  targetSizeKBRef.current = targetSizeKB;
+
+  // Processing loop — triggered only when a new item starts processing
+  // We use currentIndex + isProcessing as deps (NOT state.queue) to avoid
+  // cancelling the in-flight compression on every progress update.
   useEffect(() => {
     if (!state.isProcessing || state.currentIndex < 0) return;
 
     const currentItem = state.queue[state.currentIndex];
-    if (!currentItem || (currentItem.status !== 'processing')) return;
+    if (!currentItem || currentItem.status !== 'processing') return;
 
     let cancelled = false;
 
     async function processItem() {
       const item = currentItem;
 
-      // Skip files already under target
       if (item.alreadyUnderTarget) {
-        if (!cancelled) {
-          dispatch({ type: 'SKIP_ITEM', payload: { id: item.id } });
-        }
+        if (!cancelled) dispatch({ type: 'SKIP_ITEM', payload: { id: item.id } });
         return;
       }
 
       try {
-        // Decode file to ImageBitmap
         const bitmap = await decodeToImageBitmap(item.file);
+        if (cancelled) { bitmap.close(); return; }
 
-        if (cancelled) {
-          bitmap.close();
-          return;
-        }
-
-        const targetSizeBytes = targetSizeKB * 1024;
+        const targetSizeBytes = targetSizeKBRef.current * 1024;
         const config: CompressionConfig = {
           targetSizeBytes,
           toleranceLowerBound: Math.round(TOLERANCE_LOWER_PERCENT * targetSizeBytes),
@@ -92,38 +90,27 @@ function App() {
 
         const result = await compress(bitmap, config, getEncoder(), (progress) => {
           if (!cancelled) {
-            dispatch({
-              type: 'UPDATE_PROGRESS',
-              payload: { id: item.id, progress },
-            });
+            dispatch({ type: 'UPDATE_PROGRESS', payload: { id: item.id, progress } });
           }
         });
 
         bitmap.close();
-
         if (cancelled) return;
 
         const compressedUrl = URL.createObjectURL(result.blob);
-        dispatch({
-          type: 'COMPLETE_ITEM',
-          payload: { id: item.id, result, compressedUrl },
-        });
+        dispatch({ type: 'COMPLETE_ITEM', payload: { id: item.id, result, compressedUrl } });
       } catch (err) {
         if (cancelled) return;
         const message = err instanceof Error ? err.message : 'Compression failed';
-        dispatch({
-          type: 'FAIL_ITEM',
-          payload: { id: item.id, error: message },
-        });
+        dispatch({ type: 'FAIL_ITEM', payload: { id: item.id, error: message } });
       }
     }
 
     processItem();
 
-    return () => {
-      cancelled = true;
-    };
-  }, [state.isProcessing, state.currentIndex, state.queue, targetSizeKB]);
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.isProcessing, state.currentIndex]);
 
   return (
     <div className="min-h-screen bg-gray-50">
