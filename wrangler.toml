@@ -1,6 +1,0 @@
-# Cloudflare Pages configuration for Image Compressor
-# This is a static-only site — no server-side functions or API routes.
-
-name = "web-image-compress"
-pages_build_output_dir = "./dist"
-compatibility_date = "2026-04-07"
