@@ -47,11 +47,11 @@ describe('Feature: image-compressor, Property 1: Unsupported format rejection', 
    * For any file with a MIME type not in the supported set,
    * the validator rejects the file with an error message containing the MIME type.
    */
-  it('rejects any file with unsupported MIME type and includes the format in the reason', () => {
-    fc.assert(
-      fc.property(unsupportedMimeType, fc.integer({ min: 0, max: 10_000_000 }), (mimeType, fileSize) => {
+  it('rejects any file with unsupported MIME type and includes the format in the reason', async () => {
+    await fc.assert(
+      fc.asyncProperty(unsupportedMimeType, fc.integer({ min: 0, max: 10_000_000 }), async (mimeType, fileSize) => {
         const file = makeFile('test-file', mimeType, fileSize);
-        const result = validateFiles([file], 400_000);
+        const result = await validateFiles([file], 400_000);
 
         // File must be in rejected array
         expect(result.rejected).toHaveLength(1);
@@ -75,18 +75,18 @@ describe('Feature: image-compressor, Property 2: Already-under-target detection'
    * For any file with a supported MIME type whose size is <= target size,
    * the validator marks it as alreadyUnderTarget: true.
    */
-  it('marks any supported file at or below target size as alreadyUnderTarget', () => {
-    fc.assert(
-      fc.property(
+  it('marks any supported file at or below target size as alreadyUnderTarget', async () => {
+    await fc.assert(
+      fc.asyncProperty(
         fc.constantFrom(...SUPPORTED_LIST),
         // targetSize >= 1 so we can generate fileSize <= targetSize
         fc.integer({ min: 1, max: 10_000_000 }),
         fc.integer({ min: 0, max: 10_000_000 }),
-        (mimeType, targetSize, rawFileSize) => {
+        async (mimeType, targetSize, rawFileSize) => {
           // Ensure fileSize <= targetSize
           const fileSize = rawFileSize % (targetSize + 1);
           const file = makeFile('photo.jpg', mimeType, fileSize);
-          const result = validateFiles([file], targetSize);
+          const result = await validateFiles([file], targetSize);
 
           expect(result.valid).toHaveLength(1);
           expect(result.rejected).toHaveLength(0);

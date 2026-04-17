@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useMemo } from 'react';
 import type { DragEvent, ChangeEvent } from 'react';
 
 interface DropZoneProps {
@@ -8,9 +8,21 @@ interface DropZoneProps {
 
 const ACCEPT = '.jpg,.jpeg,.png,.heic,.heif,.bmp,image/jpeg,image/png,image/heic,image/heif,image/bmp';
 
+/**
+ * Detect touch-only devices (iOS / Android) where drag-and-drop from
+ * external apps is not supported. We show adjusted copy for these users.
+ */
+function isTouchDevice(): boolean {
+  return (
+    'ontouchstart' in window ||
+    navigator.maxTouchPoints > 0
+  );
+}
+
 export function DropZone({ onFilesSelected, disabled = false }: DropZoneProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isTouch = useMemo(() => isTouchDevice(), []);
 
   const handleDragOver = useCallback(
     (e: DragEvent<HTMLDivElement>) => {
@@ -54,7 +66,7 @@ export function DropZone({ onFilesSelected, disabled = false }: DropZoneProps) {
     <div
       role="button"
       tabIndex={0}
-      aria-label="Drop images here or click to select"
+      aria-label={isTouch ? 'Tap to select images' : 'Drop images here or click to select'}
       onClick={handleClick}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -90,7 +102,9 @@ export function DropZone({ onFilesSelected, disabled = false }: DropZoneProps) {
           d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
         />
       </svg>
-      <p className="text-sm font-medium">Drop images here or click to select</p>
+      <p className="text-sm font-medium">
+        {isTouch ? 'Tap to select images' : 'Drop images here or click to select'}
+      </p>
       <p className="mt-1 text-xs">JPEG, PNG, HEIC, HEIF, BMP</p>
 
       <input

@@ -11,12 +11,80 @@ const FORMAT_LABELS: Record<ImageFormat, string> = {
 
 const SUPPORTED_LABEL = Object.values(FORMAT_LABELS).join(', ');
 
-export function validateFiles(files: File[], targetSizeBytes: number): ValidationResult {
+/**
+ * Detect image format from magic bytes when the browser-reported MIME type
+ * is missing or unrecognised. This is common on iOS where HEIC files may
+ * have an empty `file.type`.
+ */
+async function detectFormatFromBytes(file: File): Promise<ImageFormat | null> {
+  try {
+    // Read the first 12 bytes — enough for all signatures we check.
+    const header = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+
+    // JPEG: FF D8 FF
+    if (header[0] === 0xFF && header[1] === 0xD8 && header[2] === 0xFF) {
+      return 'image/jpeg';
+    }
+
+    // PNG: 89 50 4E 47
+    if (header[0] === 0x89 && header[1] === 0x50 && header[2] === 0x4E && header[3] === 0x47) {
+      return 'image/png';
+    }
+
+    // BMP: 42 4D
+    if (header[0] === 0x42 && header[1] === 0x4D) {
+      return 'image/bmp';
+    }
+
+    // HEIC/HEIF: ftyp box starting at offset 4
+    if (header.length >= 12) {
+      const ftyp =
+        String.fromCharCode(header[4]) +
+        String.fromCharCode(header[5]) +
+        String.fromCharCode(header[6]) +
+        String.fromCharCode(header[7]);
+
+      if (ftyp === 'ftyp') {
+        const brand =
+          String.fromCharCode(header[8]) +
+          String.fromCharCode(header[9]) +
+          String.fromCharCode(header[10]) +
+          String.fromCharCode(header[11]);
+
+        const heicBrands = ['heic', 'heix', 'hevc', 'hevx', 'mif1', 'msf1'];
+        if (heicBrands.includes(brand)) {
+          return 'image/heic';
+        }
+      }
+    }
+
+    // Also check file extension as a last resort
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (ext === 'heic') return 'image/heic';
+    if (ext === 'heif') return 'image/heif';
+  } catch {
+    // arrayBuffer may fail on very small/corrupt files — fall through
+  }
+
+  return null;
+}
+
+export async function validateFiles(files: File[], targetSizeBytes: number): Promise<ValidationResult> {
   const valid: ValidImageFile[] = [];
   const rejected: RejectedFile[] = [];
 
   for (const file of files) {
-    if (!SUPPORTED_MIME_TYPES.has(file.type as ImageFormat)) {
+    let format = file.type as ImageFormat;
+
+    // If the browser didn't provide a recognised MIME type, try magic bytes.
+    if (!SUPPORTED_MIME_TYPES.has(format)) {
+      const detected = await detectFormatFromBytes(file);
+      if (detected) {
+        format = detected;
+      }
+    }
+
+    if (!SUPPORTED_MIME_TYPES.has(format)) {
       rejected.push({
         file,
         reason: `Unsupported format: ${file.type || 'unknown'}. Supported: ${SUPPORTED_LABEL}`,
@@ -26,7 +94,7 @@ export function validateFiles(files: File[], targetSizeBytes: number): Validatio
 
     valid.push({
       file,
-      format: file.type as ImageFormat,
+      format,
       alreadyUnderTarget: file.size <= targetSizeBytes,
     });
   }

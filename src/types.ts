@@ -47,6 +47,8 @@ export interface CompressionResult {
 export interface QueueItem {
   id: string;
   file: File;
+  /** The format detected by magic-byte sniffing (may differ from file.type on iOS). */
+  detectedFormat: ImageFormat;
   status: 'pending' | 'processing' | 'completed' | 'failed' | 'skipped';
   progress?: CompressionProgress;
   result?: CompressionResult;

@@ -33,9 +33,9 @@ function App() {
 
   // Handle files selected from DropZone
   const handleFilesSelected = useCallback(
-    (files: File[]) => {
+    async (files: File[]) => {
       const targetSizeBytes = targetSizeKB * 1024;
-      const { valid, rejected } = validateFiles(files, targetSizeBytes);
+      const { valid, rejected } = await validateFiles(files, targetSizeBytes);
 
       setRejectedFiles(rejected);
 
@@ -76,13 +76,15 @@ function App() {
       }
 
       try {
-        const bitmap = await decodeToImageBitmap(item.file);
+        // Pass the detected format so the decoder knows the real type
+        // even when file.type is empty (common on iOS for HEIC).
+        const bitmap = await decodeToImageBitmap(item.file, item.detectedFormat);
         if (cancelled) { bitmap.close(); return; }
 
         // For HEIC/HEIF on non-Safari browsers, the raw file URL isn't displayable.
         // Encode the decoded bitmap at max quality to create a viewable original preview.
         // Safari supports HEIC natively, so skip this to preserve the original experience.
-        const isHeic = item.file.type === 'image/heic' || item.file.type === 'image/heif';
+        const isHeic = item.detectedFormat === 'image/heic' || item.detectedFormat === 'image/heif';
         const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
         if (isHeic && !isSafari && !cancelled) {
           const previewBlob = await getEncoder().encode(bitmap, 1.0);

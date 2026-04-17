@@ -83,6 +83,7 @@ export function queueReducer(state: AppState, action: QueueAction): AppState {
       const newItems: QueueItem[] = action.payload.files.map((vf) => ({
         id: generateId(),
         file: vf.file,
+        detectedFormat: vf.format,
         status: 'pending' as const,
         originalUrl: URL.createObjectURL(vf.file),
         alreadyUnderTarget: vf.alreadyUnderTarget,
