@@ -12,6 +12,26 @@ const FORMAT_LABELS: Record<ImageFormat, string> = {
 const SUPPORTED_LABEL = Object.values(FORMAT_LABELS).join(', ');
 
 /**
+ * Read the first N bytes of a file. Uses arrayBuffer() where available,
+ * falls back to FileReader for older iOS Safari versions.
+ */
+function readFileHeader(file: File, bytes: number): Promise<Uint8Array> {
+  const slice = file.slice(0, bytes);
+
+  if (typeof slice.arrayBuffer === 'function') {
+    return slice.arrayBuffer().then((buf) => new Uint8Array(buf));
+  }
+
+  // Fallback for older browsers (e.g. iOS Safari < 14)
+  return new Promise<Uint8Array>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(new Uint8Array(reader.result as ArrayBuffer));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsArrayBuffer(slice);
+  });
+}
+
+/**
  * Detect image format from magic bytes when the browser-reported MIME type
  * is missing or unrecognised. This is common on iOS where HEIC files may
  * have an empty `file.type`.
@@ -19,7 +39,7 @@ const SUPPORTED_LABEL = Object.values(FORMAT_LABELS).join(', ');
 async function detectFormatFromBytes(file: File): Promise<ImageFormat | null> {
   try {
     // Read the first 12 bytes — enough for all signatures we check.
-    const header = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+    const header = await readFileHeader(file, 12);
 
     // JPEG: FF D8 FF
     if (header[0] === 0xFF && header[1] === 0xD8 && header[2] === 0xFF) {

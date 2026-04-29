@@ -55,9 +55,11 @@ export function DropZone({ onFilesSelected, disabled = false }: DropZoneProps) {
   const handleFileChange = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       const files = Array.from(e.target.files ?? []);
-      if (files.length > 0) onFilesSelected(files);
-      // Reset so the same file can be selected again
+      // Reset BEFORE calling the (possibly async) callback.
+      // On iOS Safari, resetting the input after an async callback starts
+      // can invalidate the File objects mid-read, causing a TypeError.
       e.target.value = '';
+      if (files.length > 0) onFilesSelected(files);
     },
     [onFilesSelected],
   );
